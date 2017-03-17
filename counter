@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+# coding: utf-8
+
+require 'date'
+require "net/http"
+require 'thor'
+
+class Counter < Thor
+  default_command :ghc
+
+  desc 'contributions [user] [start date: yyyyMMdd] [end date: yyyyMMdd]', 'Count your contritbutions on GitHub'
+  def contributions(user, from, to = Date.today.strftime("%Y%m%d"))
+    to = Date.parse to
+    from = Date.parse from
+
+    list = all_contibutiuons(user)
+    filtered = list.select { |match| match[:date] >= from }
+                 .select { |match| match[:date] <= to }
+
+    p filtered.map { |m| m[:date].strftime("%Y-%m-%d") }
+    p filtered.map { |m| m[:count] }
+
+    p filtered.map { |match| match[:count] }.inject(0) { |sum, i| sum + i }
+  end
+
+  private
+  def all_contibutiuons(user)
+    source = File.open("profile.html").read
+    pattern = /<rect class=\"day\" width=\"[0-9]+\" height=\"[0-9]+\" x=\"[0-9\-]+\" y=\"[0-9\-]+\" fill=\"#[A-z0-9]+\" data-count=\"([0-9]+)\" data-date=\"([0-9]{4}-[0-9]{1,2}-[0-9]{1,2})\"/m
+    matches = source.scan pattern
+    matches.map { |match| { count: match[0].to_i, date: Date.parse(match[1]) } }
+  end
+
+end
+
+Counter.start ARGV
