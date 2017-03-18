@@ -6,29 +6,40 @@ require "net/http"
 require 'thor'
 
 class Counter < Thor
-  default_command :ghc
 
-  desc 'contributions [user] [start date: yyyyMMdd] [end date: yyyyMMdd]', 'Count your contritbutions on GitHub'
-  def contributions(user, from, to = Date.today.strftime("%Y%m%d"))
-    to = Date.parse to
-    from = Date.parse from
+  desc 'contributions [user]', 'Count your contritbutions on GitHub'
+  method_option :from, aliases: '-f', default: "#{Date.today.strftime('%Y')}0101", type: :string
+  method_option :to, aliases: '-t', default: Date.today.strftime("%Y%m%d"), type: :string
+  def contributions user
+    to = Date.parse options.to
+    from = Date.parse options.from
 
-    list = all_contibutiuons(user)
-    filtered = list.select { |match| match[:date] >= from }
-                 .select { |match| match[:date] <= to }
+    all = all_contibutiuons user
+    filtered = all.select { |m| m[:date] >= from and m[:date] <= to }
 
-    p filtered.map { |m| m[:date].strftime("%Y-%m-%d") }
-    p filtered.map { |m| m[:count] }
+    range = filtered.map { |m| m[:date].strftime("%Y-%m-%d") }
+    p "From: #{range.first}"
+    p "To: #{range.last}"
 
-    p filtered.map { |match| match[:count] }.inject(0) { |sum, i| sum + i }
+    counts = filtered.map { |m| m[:count] }
+    p counts
+
+    total = counts.inject(0) { |sum, i| sum + i }
+    p "Total: #{total}"
   end
 
   private
-  def all_contibutiuons(user)
-    source = File.open("profile.html").read
+  def all_contibutiuons user
     pattern = /<rect class=\"day\" width=\"[0-9]+\" height=\"[0-9]+\" x=\"[0-9\-]+\" y=\"[0-9\-]+\" fill=\"#[A-z0-9]+\" data-count=\"([0-9]+)\" data-date=\"([0-9]{4}-[0-9]{1,2}-[0-9]{1,2})\"/m
-    matches = source.scan pattern
-    matches.map { |match| { count: match[0].to_i, date: Date.parse(match[1]) } }
+    matches = source(user).scan pattern
+    matches.map { |m| { count: m[0].to_i, date: Date.parse(m[1]) } }
+  end
+
+  def source user
+    uri = URI "https://github.com/#{user}"
+    source = Net::HTTP.get uri
+    p "#{user}: #{source}" if source.length < 20
+    source
   end
 
 end
